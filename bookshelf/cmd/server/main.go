@@ -7,19 +7,18 @@ import (
 )
 
 func main() {
-	// mux — маршрутизатор: сопоставляет путь запроса с обработчиком.
-	mux := http.NewServeMux()
-
-	// Health-check: GET /health -> {"status": "ok"}.
-	// Нужен frontend-команде и мониторингу для проверки, что сервис жив.
-	mux.HandleFunc("GET /health", healthHandler)
+	// http.HandleFunc регистрирует обработчик в стандартном роутере
+	// DefaultServeMux — он встроен в пакет net/http и используется по умолчанию.
+	// Health-check нужен frontend-команде и мониторингу для проверки, что сервис жив.
+	http.HandleFunc("/health", healthHandler)
 
 	addr := ":8080"
 	log.Printf("HTTP-сервер запускается на %s", addr)
 
+	// Второй аргумент nil означает "использовать DefaultServeMux",
+	// в котором мы только что зарегистрировали /health.
 	// ListenAndServe блокирует выполнение и слушает входящие запросы.
-	// Возвращает ошибку, только если сервер не смог запуститься или упал.
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("сервер остановлен с ошибкой: %v", err)
 	}
 }
