@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Digital Library Theme - Dark Mode */
+    --background: 240 6% 4%;
+    --foreground: 0 0% 96%;
+    
+    --card: 240 5% 10%;
+    --card-foreground: 0 0% 96%;
+    
+    --popover: 240 5% 10%;
+    --popover-foreground: 0 0% 96%;
+    
+    --primary: 30 52% 64%;
+    --primary-foreground: 240 6% 4%;
+    
+    --secondary: 30 25% 44%;
+    --secondary-foreground: 0 0% 96%;
+    
+    --muted: 240 4% 14%;
+    --muted-foreground: 220 9% 64%;
+    
+    --accent: 30 25% 44%;
+    --accent-foreground: 0 0% 96%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 96%;
+    
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 30 52% 64%;
+    
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Star rating animation */
+.star-rating svg {
+  transition: transform 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+
+.star-rating svg:hover {
+  transform: scale(1.2);
+}
+
+/* Book card hover effect */
+.book-card {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.book-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -8px hsl(var(--primary) / 0.15);
+}
+
+
+
+
+
