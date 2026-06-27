@@ -4,11 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/bookshelf/monolith/internal/domain"
 	"github.com/bookshelf/monolith/internal/repository"
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// tokenTTL — время жизни access-токена (для MVP: 1 час).
+const tokenTTL = time.Hour
 
 // Ошибки сервиса пользователей.
 var (
@@ -87,13 +92,61 @@ func (s *UserService) Register(ctx context.Context, req domain.RegisterRequest) 
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
-	// 5) Генерация токена — будет реализована в следующем этапе (JWT).
-	token := ""
+	// 5) Генерация JWT-токена для нового пользователя.
+	token, err := s.generateToken(user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("generate token: %w", err)
+	}
 
 	// 6) Ответ: публичные данные (без пароля) + токен.
 	return &domain.AuthResponse{
 		AccessToken: token,
 		TokenType:   "Bearer",
+		ExpiresIn:   int(tokenTTL.Seconds()),
 		User:        user.ToPublic(),
 	}, nil
+}
+
+// generateToken создаёт подписанный JWT (HS256) с claims sub/exp/iat.
+func (s *UserService) generateToken(userID string) (string, error) {
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub": userID,                   // кому принадлежит токен
+		"exp": now.Add(tokenTTL).Unix(), // когда истекает
+		"iat": now.Unix(),               // когда выдан
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString([]byte(s.jwtSecret))
+	if err != nil {
+		return "", fmt.Errorf("sign token: %w", err)
+	}
+	return signed, nil
+}
+
+// ValidateToken проверяет подпись и срок действия токена и возвращает ID пользователя.
+// Вызывается из AuthMiddleware при каждом запросе к защищённым эндпоинтам.
+func (s *UserService) ValidateToken(tokenString string) (string, error) {
+	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
+		// Защита от подмены алгоритма: принимаем только HMAC (HS256).
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return []byte(s.jwtSecret), nil
+	})
+	if err != nil {
+		// сюда попадают и истёкший токен, и неверная подпись, и битый формат
+		return "", err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return "", errors.New("invalid token")
+	}
+
+	sub, ok := claims["sub"].(string)
+	if !ok || sub == "" {
+		return "", errors.New("invalid token subject")
+	}
+	return sub, nil
 }
