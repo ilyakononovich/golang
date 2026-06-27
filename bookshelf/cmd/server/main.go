@@ -8,10 +8,22 @@ import (
 	"github.com/bookshelf/monolith/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq" // регистрирует драйвер PostgreSQL через init()
 )
 
 func main() {
 	cfg := config.Load()
+
+	// Подключаемся к PostgreSQL. sqlx.Connect открывает соединение
+	// и сразу делает Ping — если БД недоступна, вернётся ошибка.
+	db, err := sqlx.Connect("postgres", cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("не удалось подключиться к базе данных: %v", err)
+	}
+	defer db.Close()
+	log.Println("Connected to database")
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
