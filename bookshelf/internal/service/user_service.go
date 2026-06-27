@@ -107,6 +107,82 @@ func (s *UserService) Register(ctx context.Context, req domain.RegisterRequest) 
 	}, nil
 }
 
+// Login аутентифицирует пользователя по email и паролю и возвращает токен.
+// В обоих случаях (нет такого email / неверный пароль) возвращает ErrInvalidCredentials,
+// чтобы не раскрывать, зарегистрирован ли email.
+func (s *UserService) Login(ctx context.Context, req domain.LoginRequest) (*domain.AuthResponse, error) {
+	// 1) Ищем пользователя по email.
+	user, err := s.repo.GetByEmail(ctx, req.Email)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrInvalidCredentials
+		}
+		return nil, fmt.Errorf("get user by email: %w", err)
+	}
+
+	// 2) Сравниваем пароль с хешем. Несовпадение -> те же ErrInvalidCredentials.
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	// 3) Генерируем токен.
+	token, err := s.generateToken(user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("generate token: %w", err)
+	}
+
+	// 4) Ответ: публичные данные + токен.
+	return &domain.AuthResponse{
+		AccessToken: token,
+		TokenType:   "Bearer",
+		ExpiresIn:   int(tokenTTL.Seconds()),
+		User:        user.ToPublic(),
+	}, nil
+}
+
+// GetByID возвращает пользователя по ID. Делегирует в репозиторий.
+func (s *UserService) GetByID(ctx context.Context, userID string) (*domain.User, error) {
+	return s.repo.GetByID(ctx, userID)
+}
+
+// Update обновляет профиль пользователя (PUT /users/me).
+// В MVP меняется только username; пустой username трактуется как «не менять».
+func (s *UserService) Update(ctx context.Context, userID string, req domain.UpdateUserRequest) (*domain.User, error) {
+	// 1) Получаем текущего пользователя.
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2) Если username передан — валидируем длину и уникальность.
+	if req.Username != "" {
+		if len(req.Username) < 3 {
+			return nil, ErrInvalidUsername
+		}
+
+		// Уникальность через GetByUsername (а не UsernameExists), чтобы отличить
+		// «имя занято другим» от «это его же имя».
+		existing, err := s.repo.GetByUsername(ctx, req.Username)
+		switch {
+		case errors.Is(err, repository.ErrUserNotFound):
+			// имя свободно — продолжаем
+		case err != nil:
+			return nil, fmt.Errorf("check username: %w", err)
+		case existing.ID != userID:
+			return nil, ErrUsernameExists // имя занято другим пользователем
+		}
+		// если existing.ID == userID — имя его собственное, ничего не проверяем
+
+		user.Username = req.Username
+	}
+
+	// 3) Сохраняем изменения.
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, fmt.Errorf("update user: %w", err)
+	}
+	return user, nil
+}
+
 // generateToken создаёт подписанный JWT (HS256) с claims sub/exp/iat.
 func (s *UserService) generateToken(userID string) (string, error) {
 	now := time.Now()
