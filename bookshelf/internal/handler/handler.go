@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/bookshelf/monolith/internal/domain"
@@ -71,6 +72,38 @@ func decodeJSON(r *http.Request, v interface{}) error {
 func getUserID(ctx context.Context) string {
 	id, _ := ctx.Value(userIDKey).(string)
 	return id
+}
+
+// AuthMiddleware проверяет JWT из заголовка Authorization и кладёт userID в контекст.
+// При любой проблеме с токеном отвечает 401 и прерывает цепочку (next не вызывается).
+func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 1) Заголовок Authorization обязателен.
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			writeError(w, r, http.StatusUnauthorized, "unauthorized", "Authorization header required")
+			return
+		}
+
+		// 2-4) Разбираем формат "Bearer <token>".
+		parts := strings.Fields(authHeader)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
+			writeError(w, r, http.StatusUnauthorized, "unauthorized", "Invalid authorization header format")
+			return
+		}
+		token := parts[1]
+
+		// 5-6) Валидируем токен и извлекаем userID.
+		userID, err := h.services.User.ValidateToken(token)
+		if err != nil {
+			writeError(w, r, http.StatusUnauthorized, "unauthorized", "Invalid or expired token")
+			return
+		}
+
+		// 7-8) Кладём userID в контекст и передаём управление дальше.
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // Health — liveness-проба: сервис жив.
