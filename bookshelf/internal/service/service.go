@@ -16,6 +16,6 @@ func New(repos *repository.Repository, jwtSecret string) *Service {
 	return &Service{
 		User:   NewUserService(repos.User, jwtSecret),
 		Book:   NewBookService(repos.Book, repos.User),
-		Review: NewReviewService(repos.Review),
+		Review: NewReviewService(repos.Review, repos.Book, repos.User),
 	}
 }
