@@ -1,6 +1,3 @@
--- Seed data for Bookshelf application
--- Password for all users: password123 (bcrypt hash)
-
 -- ==================== USERS ====================
 INSERT INTO users (id, username, email, password_hash, created_at, updated_at) VALUES
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'admin', 'admin@bookshelf.dev', '$2a$10$jNrHsa4DtpbIgeAxQgZngOaNS0hRC6glNsuqpJNdzW7z0Gt5626IG', '2024-01-01 10:00:00+00', '2024-01-01 10:00:00+00'),
