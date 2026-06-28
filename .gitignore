@@ -30,3 +30,7 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Frontend — не храним в репозитории (слишком много файлов для проверяющей платформы),
+# но оставляем на диске, чтобы локально поднимать через docker compose (build: ./frontend).
+bookshelf/frontend/
